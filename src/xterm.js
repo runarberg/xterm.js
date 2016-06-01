@@ -630,10 +630,25 @@
       * Parse User-Agent
       */
       if (this.context.navigator && this.context.navigator.userAgent) {
-        this.isMac = !!~this.context.navigator.userAgent.indexOf('Mac');
-        this.isIpad = !!~this.context.navigator.userAgent.indexOf('iPad');
-        this.isIphone = !!~this.context.navigator.userAgent.indexOf('iPhone');
         this.isMSIE = !!~this.context.navigator.userAgent.indexOf('MSIE');
+      }
+
+      /*
+      * Find the users platform. We use this to interpret the meta key
+      * and ISO third level shifts.
+      * http://stackoverflow.com/questions/19877924/what-is-the-list-of-possible-values-for-navigator-platform-as-of-today
+      */
+      if (this.context.navigator && this.context.navigator.platform) {
+        this.isMac = contains(
+          this.context.navigator.platform,
+          ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K']
+        );
+        this.isIpad = this.context.navigator.platform === 'iPad';
+        this.isIphone = this.context.navigator.platform === 'iPhone';
+        this.isMSWindows = contains(
+          this.context.navigator.platform,
+          ['Windows', 'Win16', 'Win32', 'WinCE']
+        );
       }
 
       /*
@@ -2492,7 +2507,8 @@
               // ^] - group sep
               key = String.fromCharCode(29);
             }
-          } else if ((!this.isMac && ev.altKey) || (this.isMac && ev.metaKey)) {
+          } else if (!this.isMac && ev.altKey && !ev.ctrlKey && !ev.metaKey) {
+            // On Mac this is a third level shift. Use <Esc> instead.
             if (ev.keyCode >= 65 && ev.keyCode <= 90) {
               key = '\x1b' + String.fromCharCode(ev.keyCode + 32);
             } else if (ev.keyCode === 192) {
@@ -2504,7 +2520,11 @@
           break;
       }
 
-      if (!key || (this.isMac && ev.metaKey)) {
+      var thirdLevelShift =
+          (this.isMac && ev.altKey && !ev.ctrlKey && !ev.metaKey) ||
+          (this.isMSWindows && ev.altKey && ev.ctrlKey && !ev.metaKey);
+
+      if (!key || thirdLevelShift) {
         return true;
       }
 
@@ -2541,7 +2561,13 @@
         return false;
       }
 
-      if (!key || ev.ctrlKey || ev.altKey || ev.metaKey) {
+      var thirdLevelShift =
+          (this.isMac && ev.altKey && !ev.ctrlKey && !ev.metaKey) ||
+          (this.isMSWindows && ev.altKey && ev.ctrlKey && !ev.metaKey);
+
+      if (!key || (
+        (ev.altKey || ev.ctrlKey || ev.metaKey) && !thirdLevelShift
+      )) {
         return false;
       }
 
@@ -4351,6 +4377,15 @@
     /**
      * Helpers
      */
+
+    function contains(el, arr) {
+      for (var i = 0; i < arr.length; i += 1) {
+        if (el === arr[i]) {
+          return true;
+        }
+      }
+      return false;
+    }
 
     function on(el, type, handler, capture) {
       if (!Array.isArray(el)) {
